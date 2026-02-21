@@ -242,35 +242,19 @@ async function claim(){
 
   const payload = { type:"CLAIM", prize:lastPrize, point:urlP, ts:Date.now() };
 
-  // Важно: sendData работает ТОЛЬКО внутри Telegram WebApp
   if (!tg) {
-    alert("Откройте Mini App через кнопку бота (тогда появится Telegram.WebApp).");
+    alert("Откройте Mini App через кнопку в боте (WebApp).");
     return;
   }
 
-  try {
-    // лёгкая вибрация (если поддерживается)
-    tg.HapticFeedback?.impactOccurred?.("medium");
+  // 1) Показать, что клик точно сработал
+  tg.showAlert?.("Отправляю заявку боту…");
 
-    // отправка данных в бот (поймается обработчиком WEB_APP_DATA)
-    tg.sendData(JSON.stringify(payload));
+  // 2) Отправить
+  tg.sendData(JSON.stringify(payload));
 
-    // красивое подтверждение (если поддерживается)
-    if (tg.showPopup) {
-      await tg.showPopup({
-        title: "Готово",
-        message: "Заявка отправлена боту. Сейчас вернётесь в чат.",
-        buttons: [{ type: "close" }]
-      });
-    } else {
-      tg.showAlert?.("Заявка отправлена боту.");
-    }
-
-    // закрываем mini app и возвращаем в чат
-    tg.close();
-  } catch (e) {
-    tg.showAlert?.("Не удалось отправить заявку. Откройте через кнопку бота и попробуйте ещё раз.");
-  }
+  // 3) Дать 200–400мс на доставку и только потом закрыть
+  setTimeout(() => tg.close(), 350);
 }
 
   document.getElementById('spin').onclick=spin;
