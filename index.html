@@ -237,16 +237,41 @@
     spinning=false;
   }
 
-  function claim(){
-    if (!lastPrize) return;
-    const payload = { type:"CLAIM", prize:lastPrize, point:urlP, ts:Date.now() };
-    if (tg) {
-      tg.sendData(JSON.stringify(payload));
-      tg.showAlert("✅ Заявка отправлена боту");
-    } else {
-      alert("Откройте внутри Telegram.\n\n"+JSON.stringify(payload,null,2));
-    }
+async function claim(){
+  if (!lastPrize) return;
+
+  const payload = { type:"CLAIM", prize:lastPrize, point:urlP, ts:Date.now() };
+
+  // Важно: sendData работает ТОЛЬКО внутри Telegram WebApp
+  if (!tg) {
+    alert("Откройте Mini App через кнопку бота (тогда появится Telegram.WebApp).");
+    return;
   }
+
+  try {
+    // лёгкая вибрация (если поддерживается)
+    tg.HapticFeedback?.impactOccurred?.("medium");
+
+    // отправка данных в бот (поймается обработчиком WEB_APP_DATA)
+    tg.sendData(JSON.stringify(payload));
+
+    // красивое подтверждение (если поддерживается)
+    if (tg.showPopup) {
+      await tg.showPopup({
+        title: "Готово",
+        message: "Заявка отправлена боту. Сейчас вернётесь в чат.",
+        buttons: [{ type: "close" }]
+      });
+    } else {
+      tg.showAlert?.("Заявка отправлена боту.");
+    }
+
+    // закрываем mini app и возвращаем в чат
+    tg.close();
+  } catch (e) {
+    tg.showAlert?.("Не удалось отправить заявку. Откройте через кнопку бота и попробуйте ещё раз.");
+  }
+}
 
   document.getElementById('spin').onclick=spin;
   document.getElementById('claim').onclick=claim;
