@@ -112,24 +112,27 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { tg.ready(); tg.expand(); document.getElementById('ctx').textContent="Telegram ✅"; }
 
-  // точка из URL: ?p=L189 (бот будет открывать Mini App так)
   const urlP = new URLSearchParams(location.search).get("p") || "";
   if (urlP) document.getElementById("sub").textContent = `Точка: ${urlP}. Крутите рулетку и забирайте приз.`;
 
+  // ✅ ДОБАВИЛИ "Обои" (wallpaper), "Открытка" по-прежнему убрана
   const PRIZES = [
-    { id:"card",  label:"Открытка 💌", desc:"Цифровая открытка (рандом).", w:10 },
-    { id:"val",   label:"Валентинка ❤️", desc:"Цифровая валентинка (рандом).", w:10 },
-    { id:"st1",   label:"Стикерпак #1 🧩", desc:"Цифровой стикерпак.", w:10 },
-    { id:"st2",   label:"Стикерпак #2 🎁", desc:"Физический (выдача вручную).", w:10 },
-    { id:"retry", label:"Вторая попытка 🔁", desc:"Можно крутить ещё раз сразу.", w:20 },
-    { id:"b50",   label:"+50 бонусов ☕️",  desc:"1 бонус = 1 рубль.", w:10 },
-    { id:"b100",  label:"+100 бонусов ☕️", desc:"1 бонус = 1 рубль.", w:10 },
-    { id:"b200",  label:"+200 бонусов ☕️", desc:"1 бонус = 1 рубль.", w:5  },
-    { id:"b500",  label:"+500 бонусов ☕️", desc:"1 бонус = 1 рубль.", w:3  },
-    { id:"b1000", label:"+1000 бонусов 👑", desc:"1 бонус = 1 рубль.", w:3  },
-    { id:"b2500", label:"+2500 бонусов 👑", desc:"1 бонус = 1 рубль.", w:2  },
-    { id:"b5000", label:"+5000 бонусов 👑", desc:"1 бонус = 1 рубль.", w:1  },
-    { id:"box",   label:"ЗОЛОТОЙ БИЛЕТ: Супербокс ✨", desc:"Редкий приз. Выдача вручную.", w:0.5 },
+    { id:"val",       label:"Валентинка ❤️", desc:"Цифровая валентинка (рандом).", w:10 },
+    { id:"st1",       label:"Стикерпак #1 🧩", desc:"Цифровой стикерпак.", w:10 },
+    { id:"st2",       label:"Стикерпак #2 🎁", desc:"Физический (выдача вручную).", w:10 },
+    { id:"wallpaper", label:"Обои 📱", desc:"Эксклюзивные обои для телефона.", w:12 },
+
+    { id:"retry",     label:"Вторая попытка 🔁", desc:"Можно крутить ещё раз сразу.", w:20 },
+
+    { id:"b50",       label:"+50 бонусов ☕️",  desc:"1 бонус = 1 рубль.", w:10 },
+    { id:"b100",      label:"+100 бонусов ☕️", desc:"1 бонус = 1 рубль.", w:10 },
+    { id:"b200",      label:"+200 бонусов ☕️", desc:"1 бонус = 1 рубль.", w:5  },
+    { id:"b500",      label:"+500 бонусов ☕️", desc:"1 бонус = 1 рубль.", w:3  },
+    { id:"b1000",     label:"+1000 бонусов 👑", desc:"1 бонус = 1 рубль.", w:3  },
+    { id:"b2500",     label:"+2500 бонусов 👑", desc:"1 бонус = 1 рубль.", w:2  },
+    { id:"b5000",     label:"+5000 бонусов 👑", desc:"1 бонус = 1 рубль.", w:1  },
+
+    { id:"box",       label:"ЗОЛОТОЙ БИЛЕТ: Супербокс ✨", desc:"Редкий приз. Выдача вручную.", w:0.5 },
   ];
 
   function pickPrize(){
@@ -137,6 +140,28 @@
     let r = Math.random()*total;
     for (const p of PRIZES){ r -= p.w; if (r<=0) return p; }
     return PRIZES[0];
+  }
+
+  // payload.result — единый источник правды для бота
+  function toBotResult(prize){
+    if (!prize) return null;
+    if (prize.id === "retry")     return { type:"retry" };
+    if (prize.id === "wallpaper") return { type:"wallpaper" };
+
+    if (prize.id === "val")  return { type:"valentine" };
+    if (prize.id === "st1")  return { type:"sticker", variant:1 };
+    if (prize.id === "st2")  return { type:"sticker", variant:2 };
+    if (prize.id === "box")  return { type:"golden_ticket", name:"Супербокс" };
+
+    if (prize.id === "b50")   return { type:"bonus", amount:50 };
+    if (prize.id === "b100")  return { type:"bonus", amount:100 };
+    if (prize.id === "b200")  return { type:"bonus", amount:200 };
+    if (prize.id === "b500")  return { type:"bonus", amount:500 };
+    if (prize.id === "b1000") return { type:"bonus", amount:1000 };
+    if (prize.id === "b2500") return { type:"bonus", amount:2500 };
+    if (prize.id === "b5000") return { type:"bonus", amount:5000 };
+
+    return null;
   }
 
   const canvas = document.getElementById('wheel');
@@ -148,6 +173,67 @@
   const segments = PRIZES.map(p=>p.label);
   const N = segments.length;
   const arc = (Math.PI*2)/N;
+
+  // -------------------- TEXT HELPERS (крупнее + перенос + обводка) --------------------
+  function wrapLines(text, maxCharsPerLine){
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = "";
+    for (const w of words){
+      const candidate = line ? (line + " " + w) : w;
+      if (candidate.length <= maxCharsPerLine){
+        line = candidate;
+      } else {
+        if (line) lines.push(line);
+        line = w;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function fitTextAndDraw(text, maxWidth, maxLines){
+    let fontSize = 30;
+    let lines = [];
+
+    for (let i=0; i<12; i++){
+      ctx.font = `900 ${fontSize}px system-ui`;
+      const maxChars = fontSize >= 28 ? 14 : fontSize >= 24 ? 16 : 18;
+      lines = wrapLines(text, maxChars);
+
+      if (lines.length > maxLines) {
+        fontSize -= 2;
+        continue;
+      }
+
+      let ok = true;
+      for (const ln of lines){
+        if (ctx.measureText(ln).width > maxWidth){
+          ok = false;
+          break;
+        }
+      }
+      if (ok) break;
+      fontSize -= 2;
+    }
+
+    ctx.font = `900 ${fontSize}px system-ui`;
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+
+    ctx.lineWidth = Math.max(4, Math.round(fontSize * 0.18));
+    ctx.strokeStyle = "rgba(0,0,0,.45)";
+    ctx.fillStyle = "rgba(255,255,255,.95)";
+
+    const lineH = Math.round(fontSize * 1.08);
+    const startY = -((lines.length - 1) * lineH) / 2;
+
+    for (let i=0;i<lines.length;i++){
+      const y = startY + i*lineH;
+      ctx.strokeText(lines[i], 0, y);
+      ctx.fillText(lines[i], 0, y);
+    }
+  }
 
   function drawWheel(a){
     ctx.clearRect(0,0,900,900);
@@ -173,13 +259,11 @@
 
       ctx.save();
       ctx.rotate(a0+arc/2);
-      ctx.translate(0,-R*0.72);
+      ctx.translate(0,-R*0.70);
       ctx.rotate(Math.PI/2);
-      ctx.fillStyle="rgba(255,255,255,.92)";
-      ctx.font="700 18px system-ui";
-      ctx.textAlign="center"; ctx.textBaseline="middle";
-      const t=segments[i];
-      ctx.fillText(t.length>18 ? t.slice(0,18)+"…" : t, 0, 0);
+
+      fitTextAndDraw(segments[i], 230, 3);
+
       ctx.restore();
     }
 
@@ -237,25 +321,37 @@
     spinning=false;
   }
 
-async function claim(){
-  if (!lastPrize) return;
+  function claim(){
+    if (!lastPrize) return;
 
-  const payload = { type:"CLAIM", prize:lastPrize, point:urlP, ts:Date.now() };
+    if (lastPrize.id === "retry") {
+      tg?.showAlert?.("Можно крутить ещё раз!");
+      return;
+    }
 
-  if (!tg) {
-    alert("Откройте Mini App через кнопку в боте (WebApp).");
-    return;
+    if (!tg) {
+      alert("Откройте Mini App через кнопку в боте (WebApp).");
+      return;
+    }
+
+    const result = toBotResult(lastPrize);
+    if (!result) {
+      tg.showAlert?.("Ошибка: не могу сформировать приз.");
+      return;
+    }
+
+    const payload = {
+      action: "claim",
+      result,
+      prize_ui: { id:lastPrize.id, label:lastPrize.label },
+      point: urlP,
+      ts: Date.now()
+    };
+
+    tg.showAlert?.("Отправляю заявку боту…");
+    tg.sendData(JSON.stringify(payload));
+    setTimeout(() => tg.close(), 350);
   }
-
-  // 1) Показать, что клик точно сработал
-  tg.showAlert?.("Отправляю заявку боту…");
-
-  // 2) Отправить
-  tg.sendData(JSON.stringify(payload));
-
-  // 3) Дать 200–400мс на доставку и только потом закрыть
-  setTimeout(() => tg.close(), 350);
-}
 
   document.getElementById('spin').onclick=spin;
   document.getElementById('claim').onclick=claim;
